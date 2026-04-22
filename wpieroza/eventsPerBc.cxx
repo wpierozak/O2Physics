@@ -51,7 +51,7 @@ struct EventsPerBcGeneration
      }
   }
 
-  void postRun()
+  ~EventsPerBcGeneration()
   {
       LOGP(info, "Calibration objects to save: {}", mCalibrationObjects.size());
       for(const auto& [runNumber, object]: mCalibrationObjects) {
