@@ -10,6 +10,7 @@
 #include <Common/DataModel/EventSelection.h>
 #include <Common/DataModel/FT0Corrected.h>
 #include <Common/DataModel/Multiplicity.h>
+#include <Framework/EndOfStreamContext.h>
 
 using namespace o2;
 
@@ -50,8 +51,9 @@ struct EventsPerBcGeneration
      }
   }
 
-  ~EventsPerBcGeneration()
+  void postRun()
   {
+      LOGP(info, "Calibration objects to save: {}", mCalibrationObjects.size());
       for(const auto& [runNumber, object]: mCalibrationObjects) {
           std::string fileName = mCalibrationObjectFilePrefix + std::to_string(runNumber);
           try {
