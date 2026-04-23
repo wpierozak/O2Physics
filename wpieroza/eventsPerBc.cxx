@@ -14,40 +14,13 @@
 #include <Framework/EndOfStreamContext.h>
 #include <DataFormatsFT0/Digit.h>
 
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/OutputObjHeader.h>
 using namespace o2;
+using namespace o2::framework;
 
 using BCsWithRun3Matchings = o2::soa::Join<o2::aod::BCs, o2::aod::BcSels, o2::aod::Timestamps, o2::aod::Run3MatchedToBCSparse>;
-
-
-struct EventPerBcContainer
-{
-   static EventPerBcContainer& instance()
-   {
-    static EventPerBcContainer container;  
-    return container;
-   }
-
-   std::map<uint32_t, o2::ft0::EventsPerBc> mCalibrationObjects;
-   std::string mCalibrationObjectFilePrefix;
-
-   void endOfStream()
-   {
-      LOGP(info, "Calibration objects to save: {}", mCalibrationObjects.size());
-      for(const auto& [runNumber, object]: mCalibrationObjects) {
-          std::string fileName = mCalibrationObjectFilePrefix + std::to_string(runNumber);
-          try {
-            TFile fout(fileName.c_str(), "recreate");
-            fout.WriteObjectAny(&object, "o2::ft0::EventsPerBc", o2::ccdb::CcdbApi::CCDBOBJECT_ENTRY);
-            fout.Close();
-            LOGP(info, "Saved calibration object for run {} to file {}", runNumber, fileName);
-          }
-          catch(const std::exception& ex) {
-              LOGP(error, "Failed to store calibration object for run {} to file {}", runNumber, fileName);;
-          }
-          
-      }   
-   }
-};
 
 struct EventsPerBcGeneration
 {
@@ -56,12 +29,14 @@ struct EventsPerBcGeneration
   o2::framework::Configurable<int32_t> configMinSumOfAmplitude{"minSumOfAmplitude", 20, "minimum sum of amplitudes from both sides"};
   o2::framework::Configurable<std::string> configCalibrationObjectFilePrefix{"objectFileNamePrefix", "ft0EventsPerBc_", "prefix of object file"};
 
+  framework::HistogramRegistry histograms{"Histograms", {}};
   void init(o2::framework::InitContext const& ic)
   {
+    const AxisSpec axisBcs(3564, 0, 3563, "bunch collision");
+    histograms.add("hFT0_events_per_bc", "FT0 Events Per BC", kTH1F, {axisBcs});
     mMinAmplitudeSideA = configMinAmplitudeSideA;
     mMinAmplitudeSideC = configMinAmplitudeSideC;
     mMinSumOfAmplitude = configMinSumOfAmplitude;
-    mCalibrationContainer->mCalibrationObjectFilePrefix = configCalibrationObjectFilePrefix;
     LOGP(info, "Amplitude thresholds: side A - {}, side C - {}, sum - {}", mMinAmplitudeSideA, mMinAmplitudeSideC, mMinSumOfAmplitude);
   }
 
@@ -81,7 +56,7 @@ struct EventsPerBcGeneration
                 && ft0.sumAmpA() + ft0.sumAmpC() >= mMinSumOfAmplitude) {
             LOGP(debug, "Accepted event: BC - {}; amplitude A - {}; amplitude C - {}; amplitude Sum - {}", 
                     bcid, ft0.sumAmpA(), ft0.sumAmpC(), ft0.sumAmpA() + ft0.sumAmpC());
-            mCalibrationContainer->mCalibrationObjects[bc.runNumber()].histogram[bcid]++;
+            histograms.fill(HIST("hFT0_events_per_bc"), bcid);
         } else {
              LOGP(debug, "Discarded event: BC - {}; amplitude A - {}; amplitude C - {}; amplitude Sum - {}", 
                     bcid, ft0.sumAmpA(), ft0.sumAmpC(), ft0.sumAmpA() + ft0.sumAmpC());
@@ -92,7 +67,7 @@ struct EventsPerBcGeneration
 
   const uint64_t ctpTVX = (1ull << 2);
 
-  framework::Service<EventPerBcContainer> mCalibrationContainer;
+//  framework::Service<EventPerBcContainer> mCalibrationContainer;
   int32_t mMinAmplitudeSideA;
   int32_t mMinAmplitudeSideC;
   int32_t mMinSumOfAmplitude;
